@@ -1,0 +1,64 @@
+import logging
+import requests
+import re
+from telegram import Update
+from telegram.ext import Application, MessageHandler, filters, ContextTypes
+
+# ============================
+# حط توكنك هنا
+TOKEN = "8667486157:AAEQFsCccPr6toDfc3amRN70dvnDt-z8S90"
+# ============================
+
+logging.basicConfig(level=logging.INFO)
+
+TRIGGERS = ["نزار", "مدام نزار", "وين نزار", "فين نزار", "nazar", "madam nazar"]
+
+def get_nazar():
+    try:
+        r = requests.get("https://www.coyotejack.net/where-is-madam-nazar/", timeout=10)
+        text = r.text
+
+        # جيب النص
+        match = re.search(r'Madam Nazar is in (.+?)\.', text)
+        location_text = match.group(0) if match else "تفقد الموقع يدوياً"
+
+        # جيب الصورة
+        img_match = re.search(r'<img[^>]+src="(https://www\.coyotejack\.net/wp-content/uploads/[^"]+\.jpg)"', text)
+        img_url = img_match.group(1) if img_match else None
+
+        return location_text, img_url
+    except Exception as e:
+        logging.error(f"Error: {e}")
+        return None, None
+
+async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not update.message or not update.message.text:
+        return
+    text = update.message.text.lower()
+    if not any(t in text for t in TRIGGERS):
+        return
+
+    msg = await update.message.reply_text("🔍 أدور على مدام نزار...")
+    location_text, img_url = get_nazar()
+    await msg.delete()
+
+    if not location_text:
+        await update.message.reply_text("❌ ما قدرت أجيب الموقع، جرب بعد شوي!")
+        return
+
+    caption = f"🗺️ *مدام نزار اليوم*\n\n📍 {location_text}\n\n🤠 _ريد ديد أونلاين_"
+
+    try:
+        await update.message.reply_photo(photo=img_url, caption=caption, parse_mode="Markdown")
+    except:
+        await update.message.reply_text(caption, parse_mode="Markdown")
+
+def main():
+    print("🤠 بوت مدام نزار شغال!")
+    app = Application.builder().token(TOKEN).build()
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle))
+    app.run_polling(drop_pending_updates=True)
+
+if __name__ == "__main__":
+    main()
+    
